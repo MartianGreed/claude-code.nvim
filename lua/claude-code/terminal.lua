@@ -30,6 +30,7 @@ local function get_instance_identifier(git)
   end
 end
 
+
 --- Create a split window according to the specified position configuration
 --- @param position string Window position configuration
 --- @param config table Plugin configuration containing window settings
@@ -126,8 +127,14 @@ function M.toggle(claude_code, config, git)
         vim.api.nvim_win_close(win_id, true)
       end
     else
-      -- Claude Code buffer exists but is not visible, open it in a split
-      create_split(config.window.position, config, bufnr)
+      -- Claude Code buffer exists but is not visible, open it
+      if config.mode == 'buffer' then
+        -- For buffer mode, just switch to the existing buffer
+        vim.cmd('buffer ' .. bufnr)
+      else
+        -- For window mode, use split
+        create_split(config.window.position, config, bufnr)
+      end
       -- Force insert mode more aggressively unless configured to start in normal mode
       if not config.window.start_in_normal_mode then
         vim.schedule(function()
@@ -140,11 +147,11 @@ function M.toggle(claude_code, config, git)
     if bufnr and not vim.api.nvim_buf_is_valid(bufnr) then
       claude_code.claude_code.instances[instance_id] = nil
     end
-    -- This Claude Code instance is not running, start it in a new split
-    create_split(config.window.position, config)
-
-    -- Determine if we should use the git root directory
-    local cmd = 'terminal ' .. config.command
+    -- This Claude Code instance is not running, start it
+    local bufnr
+    
+    -- Determine the terminal command
+    local terminal_cmd = config.command
     if config.git and config.git.use_git_root then
       local git_root = git.get_git_root()
       if git_root then
@@ -152,12 +159,41 @@ function M.toggle(claude_code, config, git)
         local separator = config.shell.separator
         local pushd_cmd = config.shell.pushd_cmd
         local popd_cmd = config.shell.popd_cmd
-        cmd = 'terminal ' .. pushd_cmd .. ' ' .. git_root .. ' ' .. separator .. ' ' .. config.command .. ' ' .. separator .. ' ' .. popd_cmd
+        terminal_cmd = pushd_cmd .. ' ' .. git_root .. ' ' .. separator .. ' ' .. config.command .. ' ' .. separator .. ' ' .. popd_cmd
       end
     end
-
-    vim.cmd(cmd)
-    vim.cmd 'setlocal bufhidden=hide'
+    
+    if config.mode == 'buffer' then
+      -- For buffer mode, use current buffer
+      vim.cmd('enew') -- Create a new buffer in current window
+      bufnr = vim.fn.bufnr('%')
+      vim.fn.termopen(terminal_cmd)
+      
+      -- Apply buffer settings
+      vim.cmd 'setlocal bufhidden=hide'
+      if config.window.hide_numbers then
+        vim.cmd 'setlocal nonumber norelativenumber'
+      end
+      if config.window.hide_signcolumn then
+        vim.cmd 'setlocal signcolumn=no'
+      end
+    else
+      -- For window mode (split window), use the existing logic
+      create_split(config.window.position, config)
+      
+      -- Start terminal
+      vim.cmd('terminal ' .. terminal_cmd)
+      bufnr = vim.fn.bufnr('%')
+      
+      -- Apply buffer settings
+      vim.cmd 'setlocal bufhidden=hide'
+      if config.window.hide_numbers then
+        vim.cmd 'setlocal nonumber norelativenumber'
+      end
+      if config.window.hide_signcolumn then
+        vim.cmd 'setlocal signcolumn=no'
+      end
+    end
 
     -- Create a unique buffer name (or a standard one in single instance mode)
     local buffer_name
@@ -166,18 +202,10 @@ function M.toggle(claude_code, config, git)
     else
       buffer_name = 'claude-code'
     end
-    vim.cmd('file ' .. buffer_name)
-
-    if config.window.hide_numbers then
-      vim.cmd 'setlocal nonumber norelativenumber'
-    end
-
-    if config.window.hide_signcolumn then
-      vim.cmd 'setlocal signcolumn=no'
-    end
+    vim.api.nvim_buf_set_name(bufnr, buffer_name)
 
     -- Store buffer number for this instance
-    claude_code.claude_code.instances[instance_id] = vim.fn.bufnr('%')
+    claude_code.claude_code.instances[instance_id] = bufnr
 
     -- Automatically enter insert mode in terminal unless configured to start in normal mode
     if config.window.enter_insert and not config.window.start_in_normal_mode then

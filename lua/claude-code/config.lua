@@ -55,6 +55,7 @@ local M = {}
 
 --- ClaudeCodeConfig class for main configuration
 -- @table ClaudeCodeConfig
+-- @field mode string Display mode: "window" for split window, "buffer" for current buffer
 -- @field window ClaudeCodeWindow Terminal window settings
 -- @field refresh ClaudeCodeRefresh File refresh settings
 -- @field git ClaudeCodeGit Git integration settings
@@ -66,6 +67,8 @@ local M = {}
 --- Default configuration options
 --- @type ClaudeCodeConfig
 M.default_config = {
+  -- Display mode
+  mode = 'window', -- Display mode: "window" for split window, "buffer" for current buffer
   -- Terminal window settings
   window = {
     split_ratio = 0.3, -- Percentage of screen for the terminal window (height or width)
@@ -125,6 +128,15 @@ M.default_config = {
 --- @return boolean valid
 --- @return string? error_message
 local function validate_config(config)
+  -- Validate mode
+  if type(config.mode) ~= 'string' then
+    return false, 'mode must be a string'
+  end
+
+  if config.mode ~= 'window' and config.mode ~= 'buffer' then
+    return false, 'mode must be either "window" or "buffer"'
+  end
+
   -- Validate window settings
   if type(config.window) ~= 'table' then
     return false, 'window config must be a table'

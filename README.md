@@ -90,6 +90,8 @@ The plugin can be configured by passing a table to the `setup` function. Here's 
 
 ```lua
 require("claude-code").setup({
+  -- Display mode
+  mode = "window",          -- Display mode: "window" for split window (default), "buffer" for current buffer
   -- Terminal window settings
   window = {
     split_ratio = 0.3,      -- Percentage of screen for the terminal window (height for horizontal, width for vertical splits)
